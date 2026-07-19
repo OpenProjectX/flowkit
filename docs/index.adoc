@@ -1,0 +1,63 @@
+= flowkit Technical Documentation
+:toc: left
+:toclevels: 2
+:icons: font
+:source-highlighter: rouge
+
+flowkit is a common, abstract, portable, configurable visual-builder UI kit for React,
+extracted from link:https://github.com/FlowiseAI/Flowise[Flowise]'s Agentflow canvas and
+generalized so that other products — BPMN builders, data-pipeline studios, automation
+designers — can stand up the same polished node-editor experience with a single config object.
+
+== Documents
+
+[cols="1,2", options="header"]
+|===
+| Document | Read it when
+
+| link:architecture.adoc[architecture.adoc]
+| You want the high-level design: layers, mental model, data flow, state ownership, and the three core conventions.
+
+| link:node-model.adoc[node-model.adoc]
+| You need the full spec of the graph node model: schemas, params, anchors, handle-id grammar, visibility engine, edges, the flow document — and how to extend the model.
+
+| link:backend-api-spec.adoc[backend-api-spec.adoc]
+| You are building the backend that feeds the builder: node registry, icons, async option loading, flow persistence, concurrency.
+
+| link:configuration.adoc[configuration.adoc]
+| You need the complete `FlowBuilderConfig` reference, feature flags, slots, theming, and the `useFlowBuilder` context API.
+
+| link:extending.adoc[extending.adoc]
+| You want recipes: custom registries, field renderers, node/edge renderers, connection rules, serializers — plus two full walkthroughs and the Flowise adapter as reference.
+|===
+
+== Reading order
+
+. New to the kit: link:architecture.adoc[Architecture & mental model]
+. Then link:node-model.adoc[Node model spec] to understand what nodes actually are.
+. Integrating a backend: link:backend-api-spec.adoc[Backend API spec].
+. Wiring an app: link:configuration.adoc[Configuration reference] + link:extending.adoc[Extending flowkit].
+
+== Packages
+
+[cols="1,3", options="header"]
+|===
+| Package | Contents
+
+| `@flowkit/ui-foundation`
+| Design system: theme factory (light/dark), ~35 generic MUI components, hooks, utils. No domain knowledge.
+
+| `@flowkit/flow-builder`
+| The canvas kit: `FlowBuilderCanvas`, `FlowBuilderProvider`, `NodePalette`, `SchemaFields`, `PropertyInspectorDialog`, node/edge/group/sticky components, graph utils.
+
+| `examples/playground`
+| Two complete builders on one kit: a data-pipeline studio and a BPMN builder. The portability proof.
+|===
+
+== Conventions used in these docs
+
+* *Kit* — the two npm packages together.
+* *Consumer* — an application embedding the kit (e.g. Flowise, a BPMN tool).
+* *Adapter* — the consumer-side code that implements the config interfaces.
+* *Registry* — the source of node schemas (static list, REST API, anything).
+* Code identifiers use `monospace`; file paths are relative to the repo root unless noted.

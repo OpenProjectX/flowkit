@@ -1,0 +1,308 @@
+= Extending flowkit
+:toc: left
+:toclevels: 3
+
+Recipes for every extension point, two complete walkthroughs, and the Flowise adapter
+as the reference "big consumer". Read link:configuration.adoc[Configuration] first for
+the field-by-field reference; read link:node-model.adoc[Node model] for the data shapes.
+
+== Recipe: static registry
+
+Zero backend. Schemas as a constant — the fastest way to a working builder.
+
+[source,tsx]
+----
+import type { BuilderNodeSchema, FlowBuilderConfig } from '@flowkit/flow-builder'
+
+const operators: BuilderNodeSchema[] = [
+    {
+        name: 'httpSource', label: 'HTTP Source', category: 'Sources',
+        icon: '🌐', color: '#7C3AED', baseClasses: ['Record[]'],
+        inputs: [{ label: 'URL', name: 'url', type: 'string' }]
+    }
+    // …transforms, sinks
+]
+
+const config: FlowBuilderConfig = {
+    registry: {
+        list: async () => operators,
+        renderIcon: (node) => <span style={{ fontSize: 20 }}>{node.icon}</span>
+    }
+}
+----
+
+== Recipe: server-fed registry
+
+[source,tsx]
+----
+registry: {
+    list: async () => (await fetch('/api/operators')).json(),
+    renderIcon: (node) => <img src={`/api/icons/${node.name}`} width={30} alt={node.name} />,
+    categories: (nodes) => [
+        { label: 'Sources', nodes: nodes.filter((n) => n.category === 'Sources') },
+        { label: 'Everything else', nodes: nodes.filter((n) => n.category !== 'Sources') }
+    ]
+}
+----
+
+== Recipe: custom field renderer
+
+Field renderers receive `FieldRendererProps` (`inputParam`, `data`, `value`,
+`onChange`, `disabled`, `arrayIndex?`, `parentParam?`). Register by type or by
+`"nodeName:paramName"`.
+
+[source,tsx]
+----
+import { FieldWrapper } from '@flowkit/flow-builder'
+
+// a color picker for the custom param type 'color'
+const ColorField = ({ inputParam, value, onChange, disabled }: FieldRendererProps) => (
+    <FieldWrapper inputParam={inputParam}>
+        <input type='color' value={(value as string) ?? '#7C3AED'} disabled={disabled} onChange={(e) => onChange(e.target.value)} />
+    </FieldWrapper>
+)
+
+// a one-off override for ONE param on ONE node
+const ApiKeyField = (props: FieldRendererProps) => <SecretManagedByVault {...props} />
+
+const config = {
+    fieldRenderers: {
+        color: ColorField,                    // every { type: 'color' } param
+        'httpSource:token': ApiKeyField       // only httpSource.token
+    }
+}
+----
+
+Registry merge order: kit defaults → `config.fieldRenderers` → per-instance
+`SchemaFields fieldRenderers`. Fallback for unknown types: the plain-text `default`
+renderer.
+
+== Recipe: custom node renderer
+
+Any React Flow node component works. Use `data.outputAnchors` / the node id for handle
+ids so connections and serialization stay consistent.
+
+[source,tsx]
+----
+import { Handle, Position, type NodeProps } from 'reactflow'
+import type { BuilderNodeData } from '@flowkit/flow-builder'
+
+export const GatewayNode = ({ data, selected }: NodeProps<BuilderNodeData>) => (
+    <div style={{ position: 'relative', width: 56, height: 56 }}>
+        <Handle type='target' position={Position.Left} id={data.id} />
+        <div style={{ inset: 4, position: 'absolute', transform: 'rotate(45deg)',
+                      border: `2px solid ${selected ? '#92400E' : '#D97706'}`, borderRadius: 6 }}>×</div>
+        <Handle type='source' position={Position.Right} id={data.outputAnchors?.[0]?.id} style={{ top: '30%' }} />
+        <Handle type='source' position={Position.Right} id={data.outputAnchors?.[1]?.id} style={{ top: '70%' }} />
+    </div>
+)
+
+const config = {
+    nodeRenderers: { gateway: GatewayNode },
+    resolveNodeType: (schema) => (schema.name === 'exclusiveGateway' ? 'gateway' : 'builderNode')
+}
+----
+
+TIP: custom shapes still get the full kit behavior for free — the double-click
+inspector renders their `inputParams` through `SchemaFields`; drag/dirty/save just work.
+
+== Recipe: custom edge renderer
+
+Edges receive React Flow `EdgeProps`. The kit's `BuilderEdge` (exported) is a good base;
+its `data.sourceColor`/`targetColor` are pre-resolved by the canvas.
+
+[source,tsx]
+----
+import { getBezierPath, type EdgeProps } from 'reactflow'
+
+const DottedEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition }: EdgeProps) => {
+    const [path] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
+    return <path id={id} d={path} stroke='#888' strokeDasharray='4 3' fill='none' strokeWidth={1.5} />
+}
+
+const config = { edgeRenderers: { dotted: DottedEdge }, edgeType: 'dotted' }
+----
+
+== Recipe: connection rules
+
+Compose the exported helpers, or write your own `(connection, nodes, edges) => boolean`.
+
+[source,tsx]
+----
+import { typedPortsIsValidConnection, noSelfNoCycles, typesIntersect, respectsListAnchors } from '@flowkit/flow-builder'
+
+// 1. typed ports, out of the box
+const a = { isValidConnection: typedPortsIsValidConnection, outputStrategy: 'standard' as const }
+
+// 2. BPMN sequence-flow rules: nothing INTO start events, nothing OUT of end events
+const b = {
+    isValidConnection: (conn, nodes, edges) => {
+        const source = nodes.find((n) => n.id === conn.source)
+        const target = nodes.find((n) => n.id === conn.target)
+        if (!source || !target) return false
+        if (target.type === 'bpmnStart' || source.type === 'bpmnEnd') return false
+        return noSelfNoCycles(conn, edges)
+    }
+}
+
+// 3. typed ports + list semantics + custom extra rule
+const c = {
+    isValidConnection: (conn, nodes, edges) =>
+        typesIntersect(conn) && respectsListAnchors(conn, nodes, edges) && myDomainRule(conn, nodes)
+}
+----
+
+== Recipe: recording connections in inputs (`{{ref}}` + scrubbing)
+
+[source,tsx]
+----
+const config = {
+    onConnectInput: (targetData, targetParam, sourceNodeId) => {
+        const ref = `{{${sourceNodeId}.data.instance}}`
+        if (targetParam.list) {
+            const values = (targetData.inputs[targetParam.name] as string[]) ?? []
+            targetData.inputs[targetParam.name] = [...values, ref]
+        } else {
+            targetData.inputs[targetParam.name] = ref
+        }
+    }
+    // deletion cleanup: kit default handles {{ref}} strings; override with refScrubber
+}
+----
+
+== Recipe: drop rules (`validateDrop`)
+
+[source,tsx]
+----
+validateDrop: (schema, { nodes, parentGroup }) => {
+    if (schema.name === 'startEvent' && nodes.some((n) => n.data.name === 'startEvent'))
+        return 'Only one Start Event is allowed'
+    if (parentGroup && schema.type === 'Group')
+        return 'Nested groups are not supported'
+    return undefined
+}
+----
+
+== Recipe: custom serialization
+
+[source,tsx]
+----
+const config = {
+    serialize: (rf) => ({
+        definitions: {
+            elements: rf.getNodes().map((n) => ({ id: n.id, type: n.data.name, position: n.position })),
+            sequenceFlows: rf.getEdges().map((e) => ({ sourceRef: e.source, targetRef: e.target }))
+        }
+    }),
+    deserialize: (doc) => ({ nodes: doc.nodes ?? [], edges: doc.edges ?? [], viewport: doc.viewport })
+}
+----
+
+For an *export-only* shape (BPMN XML, pipeline YAML), keep the default serialize for
+save/load and add a separate mapper in your header slot — the playground's
+"Export BPMN JSON" button does exactly that.
+
+== Recipe: execution status badges
+
+Drive `data.status` from your runtime; the default node renders the badge
+(spinner / check / error / stop).
+
+[source,tsx]
+----
+const { setNodeStatus, clearNodeStatuses } = useFlowBuilder()
+
+executionBus.on('nodeStart', (id) => setNodeStatus({ nodeId: id, status: 'INPROGRESS' }))
+executionBus.on('nodeDone', (id) => setNodeStatus({ nodeId: id, status: 'FINISHED' }))
+executionBus.on('nodeFail', (id, err) => setNodeStatus({ nodeId: id, status: 'ERROR', error: err.message }))
+executionBus.on('reset', () => clearNodeStatuses())
+----
+
+== Recipe: read-only preview
+
+[source,tsx]
+----
+features: { readOnly: true, palette: false, minZoom: 0.1 }
+----
+
+No add/edit/delete, no inspector, no palette — used by Flowise's marketplace preview.
+
+== Walkthrough 1: data-pipeline studio
+
+The full config behind `examples/playground/src/demos/pipeline/` — typed ports, no
+custom components:
+
+[source,tsx]
+----
+{
+    registry: { list: async () => pipelineOperators, renderIcon: (n) => <span>{n.icon}</span> },
+    isValidConnection: typedPortsIsValidConnection,  // Record[] → Record[] only
+    outputStrategy: 'standard',                       // type-signed handles
+    initialFlow: parseFlowDocument(localStorage.getItem('flowkit.pipeline') ?? '') ?? undefined,
+    onSave: (doc) => localStorage.setItem('flowkit.pipeline', JSON.stringify(doc)),
+    features: { minimap: true, stickyNote: false },
+    slots: { header: <PipelineHeader /> }
+}
+----
+
+Why it works with ~zero custom code: operators declare `type: 'Record[]'` input ports
+(become anchors automatically), `baseClasses: ['Record[]']` (typed outputs under the
+standard strategy), and plain form params (`string`/`number`/`options`/`json`/`code`/
+`boolean`/`file`) — the kit supplies palette, validation, inspector, dark mode, save.
+
+== Walkthrough 2: BPMN builder
+
+`examples/playground/src/demos/bpmn/` — the *other* end of the spectrum: everything
+visual is custom, all mechanics are kit defaults.
+
+[source,tsx]
+----
+{
+    registry: { list: async () => bpmnElements },
+    nodeRenderers: { bpmnStart, bpmnEnd, bpmnTask, bpmnGateway },     // custom shapes
+    resolveNodeType: (schema) => mapBpmn(schema.bpmn),                // schema → shape
+    isValidConnection: sequenceFlowRules,                             // see Recipe: connection rules
+    validateDrop: singleStartEventOnly,
+    resolveEdgeLabel: (conn) =>                                       // gateway 'yes'/'no'
+        conn.sourceHandle?.startsWith('exclusiveGateway')
+            ? conn.sourceHandle.endsWith('-output-0') ? 'yes' : 'no'
+            : undefined,
+    onSave: (doc) => localStorage.setItem('flowkit.bpmn', JSON.stringify(doc)),
+    slots: { header: <BpmnHeader /> }                                  // has the BPMN-JSON exporter
+}
+----
+
+== Reference: the Flowise adapter
+
+Flowise's v2 Agentflow canvas (`/data/Git/Flowise/packages/ui/src/views/agentflowsv2/`)
+is the production-scale consumer. Files in `builder/`:
+
+[cols="1,3", options="header"]
+|===
+| File | What it wires
+
+| `config.jsx`
+| Registry (`GET /nodes`, `AGENTFLOW_ICONS`, category blacklists), node/edge type mapping preserving legacy type strings (`agentFlow`, `iteration`, `stickyNote`), edge/connection-line labels for condition & human-input nodes, drop rules (single start node, no nested iteration), version/deprecation warnings, dirty→Redux bridge, `asyncOptionsFetcher` over `node-load-method`, Flowise serialization (credential hoisting, status stripping).
+
+| `fields.jsx`
+| Domain field renderers: `credential` (CredentialInputHandler), RichInput for `acceptVariable` strings, webhook URL/secret UIs, async options with `ConfigInput`, Flowise's `ArrayRenderer`.
+
+| `summary.jsx`
+| `renderNodeSummary`: start-input-type chip, model config chips, tool chips (incl. provider built-in tool icons).
+
+| `BuilderBridge.jsx`
+| Mirrors the kit instance into Flowise's legacy `flowContext` (chat components read it) and bridges Redux dialog state into the kit's Delete-key suspension.
+
+| `FloatingActions.jsx`
+| Chat/schedule/webhook FABs, validation popup, sync-nodes FAB.
+|===
+
+Lessons from the port worth copying:
+
+* *Keep legacy type strings.* Old saved flows contain `type: 'agentFlow'` nodes/edges —
+  the adapter maps them via `nodeRenderers`/`edgeRenderers`/`edgeType`/`resolveNodeType`
+  instead of migrating documents.
+* *Bridge, don't fight, existing state.* Dirty flags and dialog state are mirrored into
+  Redux rather than replacing it, so the header asterisk, nav guard, and other pages
+  keep working.
+* *Domain components stay home.* RichInput, CredentialInputHandler, ArrayRenderer stay
+  in Flowise and are registered as field renderers — the kit never absorbs them.

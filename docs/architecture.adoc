@@ -1,0 +1,206 @@
+= Architecture & Mental Model
+:toc: left
+:toclevels: 3
+
+This document explains the high-level design of flowkit: what the layers are, how the
+mental model works, how data flows through the system, and who owns which state.
+
+== The problem being solved
+
+Every visual builder (LLM flows, BPMN, ETL pipelines, CI designers) re-implements the
+same 80%: a canvas with pan/zoom, a node palette with search, drag-to-add nodes,
+typed connection ports, schema-driven property forms, an edit inspector, dirty
+tracking, save/load serialization, dark mode. Flowise built this 80% twice (chatflow
+v1, agentflow v2). flowkit extracts it once, as a product-agnostic kit, and injects
+the remaining 20% (what nodes exist, what they mean, where they're saved) as
+configuration.
+
+== Layers
+
+[source]
+----
+┌────────────────────────────────────────────────────────────────┐
+│  CONSUMER APP (BPMN builder / pipeline studio / Flowise)        │
+│  Supplies ONE FlowBuilderConfig: registry, rules, renderers,    │
+│  persistence, slots.                                            │
+├────────────────────────────────────────────────────────────────┤
+│  @flowkit/flow-builder          ← the canvas kit                │
+│  FlowBuilderCanvas · FlowBuilderProvider · NodePalette          │
+│  SchemaFields · PropertyInspectorDialog · BuilderNode/Edge      │
+│  GroupNode · StickyNote · graph/visibility/serialize utils      │
+├────────────────────────────────────────────────────────────────┤
+│  @flowkit/ui-foundation         ← the design system             │
+│  theme factory (light/dark) · MainCard · StyledButton/Fab       │
+│  Input/Dropdowns · CodeEditor · JsonEditor · DataGrid           │
+│  ConfirmDialog · Loader · pickers · hooks · utils               │
+└────────────────────────────────────────────────────────────────┘
+----
+
+Dependency rules, enforced by construction:
+
+* `ui-foundation` depends on nothing flowkit-internal.
+* `flow-builder` depends on `ui-foundation` (peer) for visuals.
+* *Neither package imports an API client, a store, a router, or a domain constant.*
+  Anything that smells like a product is passed in through config.
+
+== The mental model
+
+[IMPORTANT]
+====
+*The kit knows HOW to be a visual builder. Your config knows WHAT the builder is about.*
+====
+
+The kit owns the mechanics; the consumer owns the semantics. Concretely:
+
+[cols="1,1", options="header"]
+|===
+| The kit knows how to… | Your config decides…
+
+| render a palette, search it, drag nodes out of it
+| *which* nodes exist (`registry`)
+
+| drop a node, give it a unique id/label, initialize it
+| what a node *is* (`BuilderNodeSchema`), how inputs split into form fields vs ports (`isConnectionParam`)
+
+| draw handles, drag connections, prevent cycles
+| *which* connections are legal (`isValidConnection`, typed-port rules)
+
+| render a property inspector with a form per param
+| which control each param type uses (`fieldRenderers`)
+
+| track dirtiness, suspend Delete while dialogs are open
+| what "save" means and where flows go (`serialize`, `onSave`, `initialFlow`)
+
+| color nodes and edges from a resolver
+| node colors/icons/summaries (`resolveNodeColor`, `registry.renderIcon`, `renderNodeSummary`)
+|===
+
+== The node lifecycle (data flow)
+
+[source]
+----
+ registry.list()
+      │  BuilderNodeSchema[]  (palette entries)
+      ▼
+ NodePalette ──drag──▶ dataTransfer('application/reactflow', schema)
+      │
+      ▼ drop on FlowBuilderCanvas
+ getUniqueNodeId / getUniqueNodeLabel
+      ▼
+ initNode(schema)  ── splits raw inputs[] ──▶ inputParams  (form fields)
+                     │                        inputAnchors (connection ports)
+                     ├─ builds typed handle ids
+                     ├─ seeds input defaults
+                     └─ runs conditional-visibility pass
+      ▼
+ React Flow node { id, position, type, data: BuilderNodeData }
+      │
+      ├── double-click ─▶ PropertyInspectorDialog ─▶ SchemaFields
+      │                    (param.type ─▶ field renderer; edits mutate data.inputs
+      │                     and re-run the visibility engine)
+      │
+      └── connect ─▶ isValidConnection? ─▶ edge with gradient colors + label
+                     (+ optional onConnectInput side effect, e.g. {{ref}} writing)
+      ▼
+ serialize(rfInstance) ─▶ FlowDocument { nodes, edges, viewport } ─▶ onSave(doc)
+----
+
+== State ownership
+
+Two kinds of state, deliberately kept apart:
+
+Kit state (`FlowBuilderProvider` context)::
+  * the React Flow instance (captured via `onInit`, no external store)
+  * graph mutations: `deleteNode`, `deleteEdge`, `duplicateNode`, `onNodeDataChange`
+  * dirty flag (+ `config.onDirtyChange` bridge so the consumer can mirror it, e.g. into Redux)
+  * selection flag on node data (`data.selected`)
+  * dialog-open flag (suspends the Delete key while any inspector is open)
+  * the edit-target node for the inspector
+  * consumer-driven node status badges (`setNodeStatus` / `clearNodeStatuses`)
+
+Consumer state::
+  * persistence entities (flow id, name, timestamps, ownership)
+  * domain state (credentials, executions, RBAC)
+  * any store it likes — Redux, Zustand, nothing. The kit does not care.
+
+NOTE: `FlowBuilderProvider` internally wraps `reactflow`'s `ReactFlowProvider`, so
+consumers may also use `useStore` selectors from `reactflow` for reactive reads
+(e.g. "swap a FAB when the start node's input type changes").
+
+== The three core conventions
+
+Everything in the kit hangs on three conventions. They are small, serializable, and
+domain-neutral.
+
+=== 1. Handle ids carry type signatures
+
+Every handle id encodes node id, direction, param name, and a `|`-separated type list:
+
+----
+<nodeId>-input-<paramName>-<TypeA|TypeB>      (target handle)
+<nodeId>-output-<outputName>-<TypeA|TypeB>    (source handle)
+----
+
+Because the signature is in the id, connection validation needs no registry lookup —
+see `typesIntersect` / `respectsListAnchors` in `packages/flow-builder/src/utils/handles.ts`.
+
+=== 2. Inputs are a flat value map; connected references are `{{ref}}` strings
+
+`data.inputs` is `Record<string, unknown>` keyed by param name. A consumer that wants
+"this field is fed by another node's output" writes a reference string (Flowise's
+convention: `{{nodeId.data.instance}}`). The kit's default disconnect logic knows how
+to scrub such refs on node/edge deletion; consumers that never write refs are
+unaffected. Override with `config.refScrubber`.
+
+=== 3. Forms are rendered from schema, not hand-written
+
+`SchemaFields` maps `inputParam.type` to a field renderer from a merged registry
+(20 kit defaults < consumer `config.fieldRenderers` < per-instance overrides, with a
+`"nodeName:paramName"` escape hatch). Conditional visibility is declared *in the
+schema* via `show`/`hide` maps over sibling values — no custom form code for 95% of
+nodes. See link:node-model.adoc[Node model spec].
+
+== Mutation model
+
+flowkit deliberately preserves Flowise's pragmatic data style:
+
+* Param edits **mutate** `node.data.inputs[paramName] = value` in place, then the
+  structure-level update (`inputParams`, visibility) goes through `setNodes`.
+* Graph-level changes (add/delete/duplicate/connect) always go through the React Flow
+  instance (`setNodes`/`setEdges`).
+* `reactFlowInstance.getNodes()` is the canonical read; the context `nodes`/`edges`
+  getters are imperative snapshots, not reactive subscriptions.
+
+This is not purist immutable state — it is the style the Flowise schema ecosystem
+already assumes, and keeping it is what makes the kit a drop-in for that world.
+
+== Technology choices
+
+[cols="1,3", options="header"]
+|===
+| Choice | Rationale
+
+| React Flow v11 (`reactflow`)
+| The version Flowise's canvases are written against; extraction carries zero migration risk. v12 (`@xyflow/react`) is a deliberate future upgrade path, not mixed into this milestone.
+
+| TypeScript, strict
+| The kit is a public API surface; typed config interfaces are the product. Consumers may be JS (Flowise is) — they consume the compiled dist + d.ts.
+
+| MUI v5 + Emotion
+| The Flowise design language. The theme factory ships light/dark palettes with custom keys (`card`, `orange`, `teal`, `canvasHeader`…) and MUI module augmentation for type safety.
+
+| Vite library mode + `vite-plugin-dts`
+| ESM-only dist with bundled declarations; React/MUI/reactflow externalized as peers to guarantee single instances in the host app.
+
+| pnpm workspace, `pnpm -r --sort build`
+| Topological builds without extra orchestration.
+|===
+
+== What the kit deliberately does NOT do
+
+* **No backend calls.** Registry, option loading, persistence — all adapter-injected.
+  There is no `fetch` in the kit.
+* **No router.** Layout is the consumer's; the canvas fills a flex box and offers slots.
+* **No domain nodes.** LLM, BPMN, pipeline operators — all consumer schemas.
+* **No undo/redo, sub-graph clipboard, alignment guides** (yet — see roadmap in the
+  root README). Flowise never had them either; the extension points won't fight them.

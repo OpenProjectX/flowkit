@@ -1,0 +1,430 @@
+= Graph Node Model Specification
+:toc: left
+:toclevels: 3
+
+This is the normative spec of flowkit's graph model: what a node *is*, how a registry
+schema becomes a live canvas node, the handle-id grammar, the visibility engine, the
+edge model, and the serialized flow document. Types quoted are from
+`packages/flow-builder/src/types.ts`.
+
+== Two forms of a node
+
+A node exists in two forms, linked by `initNode`:
+
+[source]
+----
+BuilderNodeSchema            initNode()              BuilderNodeData
+(registry/palette form)  ───────────────▶  (live canvas form)
+backend or static list                      embedded in the React Flow node
+----
+
+== BuilderNodeSchema (registry form)
+
+[[builder-node-schema]]
+What `registry.list()` returns per palette entry. JSON-serializable; unknown extra
+fields are tolerated (`[key: string]: unknown`).
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `name` *required*
+| string
+| Unique machine name (`llmAgentflow`, `httpSource`). Used for ids, icons, renderer keys.
+
+| `label` *required*
+| string
+| Human name shown in palette and on the card.
+
+| `category` *required*
+| string
+| Palette grouping. Convention: `Label;BADGE` renders the category with a chip (`Multi Agents;DEPRECATING`).
+
+| `version`
+| number
+| Schema version; drives outdated-node warnings and sync flows.
+
+| `description`
+| string
+| Palette subtitle.
+
+| `badge`
+| `'NEW' \| 'DEPRECATING' \| string`
+| Chip on the palette entry.
+
+| `icon`
+| string
+| Icon URL (img fallback when `registry.renderIcon` is absent).
+
+| `color`
+| string
+| Base color for card tint and edge gradients.
+
+| `baseClasses`
+| string[]
+| Type signature of the node's own output when no `outputs` are declared (standard strategy).
+
+| `hideOutput`
+| boolean
+| No output anchors (terminal/sink nodes).
+
+| `hideInput`
+| boolean
+| No target handle (source/start nodes).
+
+| `inputs`
+| <<input-param,InputParam[]>>
+| Raw input definitions — split by `initNode` into form params vs connection anchors.
+
+| `credential`
+| InputParam & \{ credentialNames?: string[] }
+| Credential slot; unshifted to the top of the form, stored on `data.credential` at save.
+
+| `outputs`
+| <<output-anchor,OutputAnchor[]>>
+| Declared outputs (multi-anchor or options-group, per strategy).
+
+| `type`
+| string
+| Reserved canvas-type hint — `StickyNote`, `Iteration`/`Group`. Mapped by `config.resolveNodeType`.
+|===
+
+[[input-param]]
+== InputParam (the heart of the model)
+
+One object drives both *forms* and *ports*. All fields optional except `label`/`name`/`type`.
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `label`, `name`, `type`
+| string
+| Display label, storage key in `data.inputs`, and the field-renderer selector.
+
+| `id`
+| string
+| Handle/param id — assigned by `initNode`: `{nodeId}-input-{name}-{type}`.
+
+| `default`
+| unknown
+| Initial value; also seeds visibility evaluation.
+
+| `description`
+| string
+| Shown as an info tooltip next to the label.
+
+| `optional`
+| boolean
+| Omits the red `*`; affects nothing else by itself.
+
+| `placeholder`
+| string
+| Input placeholder.
+
+| `rows`
+| number
+| Multiline text (adds the expand-dialog affordance in Flowise's string renderer).
+
+| `list`
+| boolean
+| Anchor accepts multiple incoming edges (validation: `respectsListAnchors`).
+
+| `acceptVariable`
+| boolean
+| Field accepts `{{nodeId...}}` references; Flowise renders its RichInput with variable mentions. Also changes disconnect scrubbing to string-replace instead of clear.
+
+| `options`
+| `{ label, name, description? }[]`
+| Choices for `options` / `multiOptions`; individual options may carry their own `show`/`hide`.
+
+| `show` / `hide`
+| `Record<string, unknown>`
+| Conditional visibility maps — see <<visibility-engine>>.
+
+| `display`
+| boolean
+| Runtime flag set by the visibility engine (`false` = not rendered, value deleted).
+
+| `hidden`
+| boolean
+| Always hidden from the inspector (internal params).
+
+| `disabled`
+| boolean
+| Render read-only.
+
+| `loadMethod`
+| string
+| Method name for `asyncOptions` fetch (→ backend `node-load-method`).
+
+| `loadConfig`
+| boolean
+| Selecting an async option reveals a nested config form (Flowise's `ConfigInput`).
+
+| `array`
+| `InputParam[]`
+| Item template for the `array` type (recursive groups).
+
+| `minItems`
+| number
+| Minimum items before the array delete button hides.
+
+| `tabs`
+| `InputParam[]`
+| Tab definitions for the `tabs` type.
+
+| `tabIdentifier`
+| string
+| Persistence key prefix for the selected tab.
+
+| `datagrid`
+| `GridColDef[]`
+| Column defs for the `datagrid` type.
+
+| `codeExample`
+| string
+| `code` type: offers an "insert example" button.
+
+| `codeLanguage`
+| string
+| CodeMirror language for the `code` type (default `js`).
+
+| `freeSolo`
+| boolean
+| `asyncOptions` allows free text.
+
+| `fileType`
+| string
+| Accept filter for the `file` type (e.g. `.csv`).
+|===
+
+=== Built-in param types
+
+[cols="1,2,3", options="header"]
+|===
+| `type` | Renderer | Value shape in `data.inputs[name]`
+
+| `string` | single-line text (variable-aware) | string
+| `password` | masked input w/ reveal | string
+| `number` | numeric input | number
+| `boolean` | switch | boolean
+| `options` | single-select dropdown | string (option `name`)
+| `multiOptions` | multi-select dropdown | JSON-array string
+| `asyncOptions` | server-fed dropdown | string
+| `asyncMultiOptions` | server-fed multi dropdown | JSON-array string
+| `json` | JSON editor (variable-aware) | JSON string
+| `code` | CodeMirror editor | string
+| `file`, `folder` | file picker | base64/string content
+| `date`, `datePicker` | date picker | date string
+| `timePicker` | time picker | `HH:mm` string
+| `weekDaysPicker` | weekday multi-select | string
+| `monthDaysPicker` | day-of-month multi-select | string
+| `datagrid` | editable grid | JSON string of row objects
+| `array` | nested item groups | array of objects
+| `tabs` | tab strip of nested params | selected tab name (under `{tabIdentifier}_{nodeId}`)
+|===
+
+Anything not in this table (e.g. Flowise's `credential`, `conditionFunction`) falls
+through to the `default` renderer (plain text) unless the consumer registers one —
+see link:extending.adoc[extending].
+
+[[output-anchor]]
+== Anchors and outputs
+
+InputAnchor — a connection port on the input side::
+`{ id?, label, name, type, list?, optional?, hidden? }` where `type` is a
+`|`-separated list of accepted types (`"BaseLanguageModel|BaseChatModel"` or `"Record[]"`).
+
+OutputOption — one selectable output on a multi-output anchor::
+`{ id, name, label, description?, type?, isAnchor?, hidden? }`
+
+OutputAnchor — the node's output side::
+`{ id?, name, label, type?, description?, options?: OutputOption[], default? }`
+
+== The initNode transformation
+
+`initNode(schema, newNodeId, { isConnectionParam?, outputStrategy? })` mutates the
+schema into canvas data (`packages/flow-builder/src/utils/graph.ts`):
+
+. *Split* — each raw `inputs[i]` gets `id = {nodeId}-input-{name}-{type}` and goes to:
+  ** `inputParams` when `isConnectionParam(param)` is *false* (default: type is in
+    `FORM_PARAM_TYPES` — the 18 form types above + `credential`, `conditionFunction`, `folder`);
+  ** `inputAnchors` otherwise (anything that looks like a port type, e.g. `BaseMemory`, `Record[]`).
+. *Credential* — `schema.credential` is unshifted onto `inputParams`.
+. *Outputs* — two strategies:
+  ** `multi` (default, v2 style): one anchor per declared output (`{nodeId}-output-{index}`),
+     or a single `{nodeId}-output-{name}` when none declared.
+  ** `standard` (v1 style, for typed ports): an `options` output anchor whose options
+     carry typed ids `{nodeId}-output-{name}-{BaseClasses|Joined}`; with no declared
+     outputs, a single `{nodeId}-output-{name}-{baseClasses.join('|')}` anchor.
+. *Defaults* — `data.inputs = { [param.name]: param.default ?? '' }`.
+. *Visibility pass* — `showHideInputParams` / `showHideInputAnchors` evaluate
+  `show`/`hide` against the seeded defaults.
+. *Housekeeping* — `outputs = {}` when none, `credential = ''` (the id slot), `id = newNodeId`.
+
+== BuilderNodeData (live canvas form)
+
+The React Flow node's `data`:
+
+[source,typescript]
+----
+interface BuilderNodeData {
+    // mirrored schema fields
+    name: string; label: string; category?: string
+    version?: number; description?: string; badge?: string
+    icon?: string; color?: string; baseClasses?: string[]
+    hideOutput?: boolean; hideInput?: boolean; hint?: string
+    credential?: InputParam & { credentialNames?: string[] }
+
+    // runtime
+    id: string
+    inputs: Record<string, unknown>   // live values, keyed by param name
+    inputAnchors: InputAnchor[]       // rendered as target handles
+    inputParams: InputParam[]         // rendered in the inspector form
+    outputAnchors: OutputAnchor[]     // rendered as source handles
+    outputs?: Record<string, unknown>
+
+    // UI state
+    selected?: boolean                // drives the selection ring
+    status?: BuilderNodeStatus        // consumer-driven badge: INPROGRESS/FINISHED/ERROR/TERMINATED/STOPPED...
+    error?: string
+}
+----
+
+[[handle-ids]]
+== Handle-id grammar
+
+----
+handle-id      = node-id "-" direction "-" param-name "-" type-signature
+node-id        = name "_" index                  ; e.g. llmAgentflow_0
+direction      = "input" | "output"
+param-name     = <input param or anchor name>
+type-signature = type *( "|" type )              ; e.g. BaseLanguageModel|BaseChatModel
+----
+
+* Parsing: `parseHandleTypes(id)` = last `-`-segment, split on `|`, trimmed.
+* Anchor-less nodes (v2 style) use the bare node id as the target handle id
+  (`id={data.id}`) — such connections carry no type signature and validate structurally only.
+* Edge ids: `{source}-{sourceHandle}-{target}-{targetHandle}` (unique per connection).
+
+[[visibility-engine]]
+== The conditional visibility engine
+
+Params declare `show`/`hide` maps keyed by a *path into* `nodeData.inputs`:
+
+[source,json]
+----
+{ "label": "Token", "name": "token", "type": "password",
+  "show": { "auth": ["bearer", "apikey"] } }
+----
+
+Evaluation (`showHideInputs` in `utils/visibility.ts`), per param:
+
+. Reset `display = true`.
+. For each `show` rule: set `display = false` unless the comparison matches.
+   For each `hide` rule: set `display = false` when the comparison matches.
+. Params with `display === false` are not rendered, and their stored value is *deleted*
+  from `inputs` (keeps saved flows clean of irrelevant values).
+
+Comparison semantics (ground = current sibling value, comparison = rule value):
+
+[cols="1,3", options="header"]
+|===
+| Types | Rule
+
+| string vs string
+| exact match OR the rule as a *regular expression* matches (`new RegExp(rule).test(ground)`)
+
+| array rule
+| ground must be *one of* the rule values
+
+| ground is array
+| match when any element matches (intersection; JSON-string arrays like `'["a","b"]'` are parsed first)
+
+| boolean / number
+| strict equality
+
+| object
+| deep equality (lodash `isEqual`)
+
+| path contains `$index`
+| substituted with the array item index (used inside `array` item groups)
+|===
+
+`options` params additionally filter their *options list* by each option's own
+`show`/`hide`. `applyVisibleInputDefaults` re-applies defaults only to visible params
+(used when values change in the inspector).
+
+== Edges
+
+[source,typescript]
+----
+{
+    id: '{source}-{sourceHandle}-{target}-{targetHandle}',
+    source, sourceHandle, target, targetHandle,
+    type: 'builderEdge',            // config.edgeType
+    data: {
+        sourceColor: string,        // resolved via config.resolveNodeColor
+        targetColor: string,        // → the SVG gradient stroke
+        edgeLabel?: string          // e.g. condition index, gateway 'yes'/'no'
+    },
+    zIndex?: 9999                   // when both ends share a group parent
+}
+----
+
+The default edge renders an SVG gradient (`sourceColor → targetColor`), a wide
+invisible hover selector, a mid-line delete button on hover, and the optional
+`EdgeLabelRenderer` label.
+
+[[flow-document]]
+== FlowDocument (the saved artifact)
+
+[source,typescript]
+----
+interface FlowDocument {
+    nodes: Node<BuilderNodeData>[]   // full data snapshots (schema + inputs)
+    edges: Edge[]
+    viewport?: { x: number; y: number; zoom: number }
+}
+----
+
+* Produced by `config.serialize` (default: React Flow `toObject()` with
+  `data.selected` stripped). Consumed by `loadFlow` / `initialFlow`.
+* **Self-contained by design**: because every node embeds its schema snapshot, a saved
+  flow renders even if the registry no longer offers that node (the version-warning
+  system handles drift — see `resolveNodeWarning`).
+* Flowise additionally hoists the credential id to `data.credential` and strips
+  passwords/files on *export* — consumer `serialize` overrides.
+
+== The `{{ref}}` convention (connected inputs)
+
+A consumer may record "this input is fed by node X" by writing a reference string into
+`inputs` (Flowise: `{{nodeId.data.instance}}`, via `config.onConnectInput`). Rules:
+
+* Plain (non-list) anchor input: the whole value is the ref.
+* `list` anchor: the value is an array of refs.
+* `acceptVariable` param: the ref may be *embedded in* free text.
+
+On node/edge deletion the provider's default disconnect logic:
+
+* list anchor → filters refs containing the deleted source id
+* `acceptVariable` → regex-removes `{{sourceId.*}}` from the string
+* otherwise → clears the value
+
+`duplicateNode` clears all refs on the copy (a duplicate must not alias the original's
+connections). Consumers replacing this wholesale implement `config.refScrubber`.
+
+== Extending the model
+
+* **New param types** — invent a `type` string; either register a renderer
+  (`fieldRenderers`) or let it fall back to `default`. If it should be a *port* instead
+  of a form field, ensure `isConnectionParam` excludes it from `FORM_PARAM_TYPES`
+  (override `config.isConnectionParam`).
+* **Richer nodes** — add fields freely (`[key: string]: unknown` on schema and data);
+  render them via `renderNodeSummary`, `nodeRenderers`, or custom fields.
+* **Versioned evolution** — bump `version`, tag `badge: 'DEPRECATING'` with
+  `deprecateMessage`; surface via `resolveNodeWarning`; migrate with a sync routine
+  (Flowise's `updateOutdatedNodeData/Edge` pattern).
+* **Custom canvas types** — `schema.type` + `config.resolveNodeType` +
+  `config.nodeRenderers` (BPMN shapes in the playground are the template).

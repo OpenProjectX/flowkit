@@ -1,0 +1,273 @@
+= Backend API Specification
+:toc: left
+:toclevels: 3
+
+[IMPORTANT]
+====
+flowkit itself makes *zero* network calls. This document does not describe an API the
+kit *requires* — it specifies the API surface a backend *should* expose to drive a
+full-featured builder, and how each endpoint maps to a config hook. Everything here is
+implemented consumer-side through the link:configuration.adoc[`FlowBuilderConfig`];
+the kit only sees the resulting JavaScript objects.
+====
+
+== API surface at a glance
+
+[cols="1,1,2,1", options="header"]
+|===
+| Endpoint | Required | Feeds config hook | Purpose
+
+| `GET /nodes`
+| yes
+| `registry.list()`
+| The node registry: all palette entries as `BuilderNodeSchema[]`.
+
+| `GET /node-icon/{name}`
+| no
+| `registry.renderIcon()`
+| Node icon images (SVG/PNG). Alternative: ship icons inline in schemas or render React nodes.
+
+| `POST /node-load-method/{nodeName}`
+| no
+| `asyncOptionsFetcher`
+| Dynamic option lists for `asyncOptions` / `asyncMultiOptions` params.
+
+| `GET /flows/{id}` · `POST /flows` · `PUT /flows/{id}`
+| no
+| `initialFlow` · `onSave`
+| Flow document persistence. localStorage or files work too.
+
+| `GET /flows/{id}/has-changed/{timestamp}`
+| no
+| consumer save flow
+| Optimistic-concurrency check before overwrite.
+
+| `GET /credentials[...]`
+| no
+| `fieldRenderers.credential`
+| Credential records for the `credential` param type (domain-specific).
+|===
+
+A *minimal* backend is exactly one endpoint (`GET /nodes`) — or zero, if schemas are
+static (see the playground demos). Everything else layers on as needed.
+
+== 1. Node registry
+
+The single most important endpoint: it defines what users can build.
+
+=== Request
+
+[source,http]
+----
+GET /api/v1/nodes?client=agentflowv2
+----
+
+Query parameters (consumer-defined; Flowise's):
+
+[cols="1,3", options="header"]
+|===
+| Param | Meaning
+
+| `client`
+| Which builder generation the schemas target (`agentflowv2` in Flowise). Useful when one backend serves multiple builder dialects.
+|===
+
+=== Response: `200 OK` — `BuilderNodeSchema[]`
+
+[source,json]
+----
+[
+  {
+    "name": "llmAgentflow",
+    "label": "LLM",
+    "version": 1,
+    "category": "Agent Flows",
+    "description": "Large language model node",
+    "badge": "NEW",
+    "color": "#64B5F6",
+    "icon": "https://cdn.example.com/icons/llm.svg",
+    "baseClasses": ["LLMAgentflow"],
+    "inputs": [
+      { "label": "Model", "name": "llmModel", "type": "asyncOptions", "loadMethod": "listModels" },
+      { "label": "Messages", "name": "llmMessages", "type": "array",
+        "array": [
+          { "label": "Role", "name": "role", "type": "options",
+            "options": [ { "label": "System", "name": "system" }, { "label": "User", "name": "user" } ] },
+          { "label": "Content", "name": "content", "type": "string", "rows": 3, "acceptVariable": true }
+        ]
+      },
+      { "label": "Enable Memory", "name": "llmEnableMemory", "type": "boolean", "default": true, "optional": true },
+      { "label": "Memory Type", "name": "llmMemoryType", "type": "options", "optional": true,
+        "options": [ { "label": "All Messages", "name": "allMessages" } ],
+        "show": { "llmEnableMemory": true } }
+    ],
+    "credential": { "label": "Credential", "name": "credential", "type": "credential",
+                    "credentialNames": ["openAIApi", "azureOpenAIApi"] },
+    "outputs": [ { "name": "0", "label": "Output" } ]
+  }
+]
+----
+
+Field-by-field rules for the schema: see link:node-model.adoc#builder-node-schema[BuilderNodeSchema spec].
+Backend notes:
+
+* **`version`** — bump it when the schema changes incompatibly; the UI can then flag
+  outdated canvas nodes (`config.resolveNodeWarning`) and offer a sync.
+* **`badge`** — `NEW` / `DEPRECATING` render as palette chips; `DEPRECATING` plus
+  `deprecateMessage` drives the node warning badge.
+* **`type`** (not shown above) — reserved hint for the canvas node type. Flowise uses
+  `Iteration` (group node) and `StickyNote` (annotation). Map it via
+  `config.resolveNodeType`.
+* Keep the payload **JSON-serializable and self-contained** — the UI stores a snapshot
+  of the schema inside the saved flow document.
+
+== 2. Node icons
+
+[source,http]
+----
+GET /api/v1/node-icon/{name}        → image/svg+xml | image/png
+----
+
+* Consumed by `registry.renderIcon()` (palette rows, node cards, summary chips).
+* Return 404 for unknown names; the UI falls back to a colored dot.
+* Alternatives that need no endpoint: put a URL in `schema.icon`, or return JSX from
+  `registry.renderIcon` (e.g. an emoji span or an icon-font component — the pipeline
+  demo does exactly this).
+
+== 3. Async option loading (`node-load-method`)
+
+Params typed `asyncOptions` / `asyncMultiOptions` declare a `loadMethod`; the UI asks
+the backend to resolve them at render time (e.g. "list available models for this
+credential"). Kit side: `config.asyncOptionsFetcher` wraps this endpoint.
+
+=== Request
+
+[source,http]
+----
+POST /api/v1/node-load-method/{nodeName}
+Content-Type: application/json
+----
+
+`{nodeName}` is the schema `name` (e.g. `llmAgentflow`). Body:
+
+[source,json]
+----
+{
+  "name": "llmAgentflow",
+  "label": "LLM 0",
+  "id": "llmAgentflow_0",
+  "inputs": { "llmEnableMemory": true, "credential": "c9f1..." },
+  "credential": "c9f1...",
+  "loadMethod": "listModels",
+  "previousNodes": [
+    { "id": "startAgentflow_0", "name": "startAgentflow", "label": "Start", "inputs": {} }
+  ],
+  "currentNode": { "id": "llmAgentflow_0", "name": "llmAgentflow", "label": "LLM 0", "inputs": { } }
+}
+----
+
+[cols="1,3", options="header"]
+|===
+| Field | Meaning
+
+| `...nodeData`
+| The full canvas node data (schema snapshot + current input values) — lets the backend tailor options to the node's current configuration.
+
+| `loadMethod`
+| The method the param asked for (`inputParam.loadMethod`).
+
+| `credential`
+| Resolved credential id, if the node has one (from `data.credential` or the credential input).
+
+| `previousNodes`
+| Upstream nodes reachable from this node (id/name/label/inputs) — needed for options like "pick a variable from an earlier node".
+
+| `currentNode`
+| This node's id/name/label/inputs.
+|===
+
+=== Response: `200 OK` — option array
+
+[source,json]
+----
+[
+  { "label": "gpt-4o", "name": "gpt-4o", "description": "Flagship, most capable" },
+  { "label": "gpt-4o-mini", "name": "gpt-4o-mini", "description": "Fast and cheap", "imageSrc": "https://.../openai.svg" }
+]
+----
+
+Option fields: `label` (display), `name` (stored value), optional `description`,
+optional `imageSrc` (rewritten by the consumer's `resolveImageSrc`, e.g. to the
+node-icon endpoint). An empty array means "no options" — the UI shows the empty list;
+fetch failures should also resolve to `[]` (the field surfaces an error state).
+
+== 4. Flow persistence
+
+A flow document is the JSON produced by `config.serialize` — by default React Flow's
+`toObject()`: `{ nodes, edges, viewport }` where each node embeds its full
+`BuilderNodeData` (schema snapshot + `inputs` value map). Spec:
+link:node-model.adoc#flow-document[FlowDocument].
+
+[source,http]
+----
+GET  /api/v1/flows/{id}                 → 200 { "id": "...", "name": "...", "flowData": "<json string>", "updatedDate": "..." }
+POST /api/v1/flows                       → 201 { "id": "..." }                body: { "name": "...", "flowData": "<json string>", ... }
+PUT  /api/v1/flows/{id}                  → 200                                body: { "name": "...", "flowData": "<json string>" }
+----
+
+Backend/consumer contract points:
+
+* `flowData` is stored **opaque** — the backend never parses it. Treat it as a blob
+  (Flowise stores the JSON string in a text column).
+* The consumer typically loads on mount (`initialFlow` via `loadFlow`) and saves via
+  `useFlowBuilder().saveFlow()` → `config.onSave(doc)`.
+* Flowise's reference adds metadata columns (`type`, `deployed`, `isPublic`,
+  `workspaceId`, `apikeyid`) — all outside the kit's concern.
+
+== 5. Optimistic concurrency
+
+[source,http]
+----
+GET /api/v1/flows/{id}/has-changed/{lastUpdatedDateTime}   → 200 { "hasChanged": true | false }
+----
+
+Called before overwriting a flow the user has had open for a while. If `hasChanged`,
+the consumer shows a confirm ("overwrite changes made elsewhere?"). Kit angle: none —
+this lives entirely in the consumer's save orchestration (the Flowise adapter's
+`handleSaveFlow`).
+
+== 6. Credentials (domain, optional)
+
+Flowise's `credential` param type renders a select of stored credentials and stores
+the chosen id in `data.credential` (hoisted out of `inputs` at serialize time). Its
+endpoints are purely domain: `GET /credentials`, `GET /credentials-by-name/{name}`, etc.
+The kit ships no credential UI — consumers register a `fieldRenderers.credential`
+renderer (the Flowise adapter wraps its `CredentialInputHandler`).
+
+== Reference: Flowise's implementation
+
+For comparison, the Flowise server (`packages/server`) implements:
+
+[cols="2,2", options="header"]
+|===
+| This spec | Flowise endpoint
+
+| Node registry | `GET /api/v1/nodes?client=agentflowv2`
+| Node detail | `GET /api/v1/nodes/{name}`
+| Nodes by category | `GET /api/v1/nodes/category/{name}`
+| Icons | `GET /api/v1/node-icon/{name}`
+| Async options | `POST /api/v1/node-load-method/{name}`
+| Custom JS eval (expand dialog "Execute") | `POST /api/v1/node-custom-function`
+| Flow CRUD | `GET/POST/PUT /api/v1/chatflows[/{id}]`
+| Concurrency | `GET /api/v1/chatflows/has-changed/{id}/{lastUpdatedDateTime}`
+| AI flow generation | `POST /api/v1/agentflowv2-generator/generate`
+|===
+
+== Backend checklist
+
+* [ ] Registry returns valid `BuilderNodeSchema[]` (validate against link:node-model.adoc[node-model]).
+* [ ] Unknown/legacy schema fields allowed — the UI tolerates extras (schemas carry an index signature).
+* [ ] Options endpoints return `[]` (not 4xx/5xx) for empty results where possible; the UI degrades gracefully.
+* [ ] Version bumps on incompatible schema changes; `DEPRECATING` badge + `deprecateMessage` when sunsetting a node.
+* [ ] Persist `flowData` opaque; return `updatedDate` for concurrency checks.
+* [ ] CORS/credentials: the UI client sends cookies (`withCredentials`) in the Flowise adapter — mirror if your builder is session-based.

@@ -1,0 +1,306 @@
+= Configuration Reference
+:toc: left
+:toclevels: 3
+
+The complete reference for wiring an app to flowkit: `FlowBuilderConfig`, feature
+flags, slots, theming, and the `useFlowBuilder` context API. Types from
+`packages/flow-builder/src/types.ts`.
+
+== Minimal wiring
+
+[source,tsx]
+----
+import { FlowBuilderProvider, FlowBuilderCanvas } from '@flowkit/flow-builder'
+import { FlowkitThemeProvider } from '@flowkit/ui-foundation'
+import '@flowkit/flow-builder/styles.css'
+
+<FlowkitThemeProvider>
+    <FlowBuilderProvider config={config}>
+        <FlowBuilderCanvas />
+    </FlowBuilderProvider>
+</FlowkitThemeProvider>
+----
+
+== FlowBuilderConfig
+
+=== Node source
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `registry` *required*
+| `NodeRegistryAdapter`
+| Palette node source. `list(): Promise<BuilderNodeSchema[]>`; optional `renderIcon(schema): ReactNode` (palette/card icon, falls back to `schema.icon` img → colored dot); optional `categories(nodes): CategoryGroup[]` (custom palette grouping, default groups by `category`).
+
+| `paletteFilter`
+| `(schema) => boolean`
+| Extra palette filter (category blacklists, feature gating). Composes with `features.stickyNote`/`groupNodes` filters.
+|===
+
+=== Forms & fields
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `fieldRenderers`
+| `FieldRendererMap`
+| Merged *over* the 20 kit defaults. Key by param `type` (`'json'`) or by `"nodeName:paramName"` for one-off overrides. Renderer props: `FieldRendererProps`.
+
+| `asyncOptionsFetcher`
+| `(args: { nodeName, methodName?, params? }) => Promise<unknown>`
+| Backs the `asyncOptions`/`asyncMultiOptions` fields (wraps your backend's option-loading endpoint). Must resolve to an option array.
+|===
+
+`FieldRendererProps`:
+
+[source,typescript]
+----
+interface FieldRendererProps {
+    inputParam: InputParam
+    data: BuilderNodeData
+    value: unknown                       // data.inputs[inputParam.name]
+    onChange: (newValue: unknown) => void
+    disabled?: boolean
+    arrayIndex?: number                  // set inside `array` items
+    parentParam?: InputParam             // the parent `array` param
+}
+----
+
+=== Node & edge rendering
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `nodeRenderers`
+| `Record<string, ComponentType>`
+| Extra/override React Flow node types (key = the `type` string from `resolveNodeType` or saved docs).
+
+| `edgeRenderers`
+| `Record<string, ComponentType>`
+| Extra/override edge types.
+
+| `resolveNodeType`
+| `(schema) => string`
+| Map a dropped schema to a node type. Default: `'StickyNote'` → `stickyNote`, `'Group'` → `groupNode`, else `builderNode`. *Must match the type strings in your saved documents.*
+
+| `edgeType`
+| string
+| Type for new edges. Default `'builderEdge'`.
+
+| `resolveNodeColor`
+| `(nodeData) => string`
+| Card tint + edge gradient source. Default: `data.color` then theme primary.
+
+| `renderNodeSummary`
+| `(nodeData) => ReactNode`
+| Extra content under the node label (Flowise's model/tool chips).
+
+| `onNodeInfo`
+| `(nodeData) => void`
+| Shows an Info button in the node toolbar.
+
+| `resolveNodeWarning`
+| `(nodeData) => string \| undefined`
+| Warning badge text (outdated version, deprecation).
+
+| `canDuplicateNode`
+| `(nodeData) => boolean`
+| Hide Duplicate in the toolbar (default true).
+|===
+
+=== Connection behavior
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `isValidConnection`
+| `(connection, nodes, edges) => boolean`
+| Gate for new edges. Default: no self-connections + no cycles (`defaultIsValidConnection`). Compose `typedPortsIsValidConnection` for type-checked ports.
+
+| `onConnectInput`
+| `(targetNodeData, targetParam, sourceNodeId) => void`
+| Post-connect side effect — e.g. write `{{source.data.instance}}` into the target's inputs.
+
+| `refScrubber`
+| `(nodes, deletedNodeId) => nodes`
+| Replace the default `{{ref}}` cleanup on node/edge deletion.
+
+| `connectionLineColor`
+| `(fromHandleId) => string`
+| Color of the in-progress connection line.
+
+| `connectionLineLabel`
+| `(fromHandleId) => string \| undefined`
+| Label on the in-progress connection line.
+
+| `resolveEdgeLabel`
+| `(connection) => string \| undefined`
+| Label stored on the new edge (rendered mid-line).
+
+| `validateDrop`
+| `(schema, { nodes, parentGroup }) => string \| undefined`
+| Reject a palette drop with a user-facing message (singleton rules, group-membership rules).
+|===
+
+Connection rule helpers exported for composition: `typesIntersect`,
+`respectsListAnchors`, `wouldCreateCycle`, `noSelfNoCycles`,
+`defaultIsValidConnection`, `typedPortsIsValidConnection`.
+
+=== Schema interpretation
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `isConnectionParam`
+| `(param) => boolean`
+| Param-vs-anchor split for raw schema inputs. Default: whitelist of 20 form types (`FORM_PARAM_TYPES`).
+
+| `outputStrategy`
+| `'multi' \| 'standard'`
+| Output anchor strategy. `'multi'` (default): v2-style one handle per output. `'standard'`: v1-style type-signed handles — use with `typedPortsIsValidConnection`.
+|===
+
+=== Persistence
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `initialFlow`
+| `FlowDocument`
+| Document loaded on mount (alternative: call `loadFlow(doc)` later).
+
+| `serialize`
+| `(rfInstance) => FlowDocument`
+| Default: React Flow `toObject()` with `data.selected` stripped.
+
+| `deserialize`
+| `(doc) => { nodes, edges, viewport }`
+| Inverse of `serialize` (default: passthrough).
+
+| `onSave`
+| `(doc) => Promise<void> \| void`
+| Called by `saveFlow()` after serialization; clears the dirty flag on completion.
+
+| `onDirtyChange`
+| `(dirty) => void`
+| Fires on dirty transitions — bridge to your store (Flowise mirrors into Redux `SET_DIRTY`/`REMOVE_DIRTY`).
+|===
+
+=== Editing & misc
+
+[cols="1,1,3", options="header"]
+|===
+| Field | Type | Description
+
+| `nodeEditMode`
+| `'dialog' \| 'inline'`
+| How params are edited. Default `'dialog'` (double-click inspector). `'inline'` is reserved for v1-style on-card forms.
+
+| `onArrayChange`
+| `(args: { data, inputParam, items, action: 'ADD'\|'DELETE'\|'CHANGE', index? }) => void`
+| Side effects after an `array` param changes (Flowise updates condition-node output anchors here).
+|===
+
+=== features
+
+All default to enabled unless noted:
+
+[source,typescript]
+----
+features?: {
+    minimap?: boolean          // MiniMap bottom-right
+    stickyNote?: boolean       // sticky-note schemas in palette
+    groupNodes?: boolean       // group nodes + drop-into parenting
+    snapping?: boolean         // snap-grid toggle in Controls
+    backgroundDots?: boolean   // background toggle in Controls
+    palette?: boolean          // show the add-node FAB (default true)
+    readOnly?: boolean         // no add/edit/delete (default false)
+    minZoom?: number           // default 0.5
+}
+----
+
+=== slots
+
+[source,typescript]
+----
+slots?: {
+    header?: ReactNode           // rendered above the canvas (toolbars)
+    floatingActions?: ReactNode  // floating over the canvas (FABs, popups)
+    paletteActions?: ReactNode   // extra FABs next to the palette add button
+}
+----
+
+== useFlowBuilder context API
+
+Available anywhere under `FlowBuilderProvider`:
+
+[source,typescript]
+----
+const {
+    reactFlowInstance,              // the React Flow instance (captured onInit)
+    nodes, edges,                   // imperative snapshots
+    isDirty, setDirty,              // dirty flag (setDirty() → true, setDirty(false) clears)
+    deleteNode, deleteEdge,         // graph mutations (with child cascade + ref scrubbing)
+    duplicateNode,
+    onNodeDataChange,               // { nodeId, inputParam, newValue } → visibility recompute
+    setNodeStatus,                  // { nodeId, status, error? } badge control
+    clearNodeStatuses,
+    dialogOpen, setDialogOpen,      // Delete-key suspension
+    editNode, setEditNode,          // inspector target
+    saveFlow,                       // serialize + onSave + clear dirty → FlowDocument
+    loadFlow,                       // replace canvas contents (import/paste) → marks dirty
+    config
+} = useFlowBuilder()
+----
+
+NOTE: `FlowBuilderProvider` wraps `reactflow`'s `ReactFlowProvider` — `useStore`,
+`useReactFlow`, `useUpdateNodeInternals` etc. work in any child component.
+
+== Theming (`@flowkit/ui-foundation`)
+
+[source,tsx]
+----
+import { FlowkitThemeProvider, useThemeMode, createFlowkitTheme } from '@flowkit/ui-foundation'
+
+// uncontrolled — persists to localStorage['isDarkMode']
+<FlowkitThemeProvider>{children}</FlowkitThemeProvider>
+
+// controlled — host owns the mode (e.g. Flowise's Redux)
+<FlowkitThemeProvider mode={isDarkMode ? 'dark' : 'light'} onModeChange={...}>
+    {children}
+</FlowkitThemeProvider>
+----
+
+* `createFlowkitTheme({ mode, fontFamily?, borderRadius? })` — the raw MUI theme
+  factory (palette incl. `card`, `orange`, `teal`, `canvasHeader`, `codeEditor`,
+  `nodeToolTip`; typography incl. `commonAvatar`, `smallAvatar`…).
+* Kit components read dark mode via `theme.palette.mode` — any MUI theme with a proper
+  `mode` works, but the full Flowise look needs the factory's custom keys.
+
+== Putting it together (annotated)
+
+[source,tsx]
+----
+const config: FlowBuilderConfig = {
+    registry: { list: fetchOperators, renderIcon: (n) => <OperatorIcon name={n.name} /> },
+    isValidConnection: typedPortsIsValidConnection,   // typed ports
+    outputStrategy: 'standard',                        // type-signed output handles
+    onConnectInput: (targetData, param, sourceId) => { // record the link in inputs
+        targetData.inputs[param.name] = `{{${sourceId}.data.instance}}`
+    },
+    validateDrop: (schema, { nodes }) =>
+        schema.name === 'source' && nodes.some((n) => n.data.name === 'source')
+            ? 'Only one source allowed'
+            : undefined,
+    onSave: (doc) => api.saveFlow(flowId, JSON.stringify(doc)),
+    onDirtyChange: (dirty) => store.setUnsaved(dirty),
+    features: { minimap: true, stickyNote: false },
+    slots: { header: <StudioHeader /> }
+}
+----
