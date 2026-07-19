@@ -1,10 +1,11 @@
 {
-    "name": "@flowkit/flow-builder",
+    "name": "@openprojectx/flow-builder",
     "version": "0.1.0",
     "description": "Portable, configurable visual node-builder canvas: palette, schema-driven forms, typed connections, serialization",
     "license": "Apache-2.0",
     "publishConfig": {
-        "access": "public"
+        "access": "public",
+        "provenance": true
     },
     "main": "./dist/index.js",
     "module": "./dist/index.js",
@@ -32,13 +33,13 @@
     "peerDependencies": {
         "@emotion/react": "^11.10.0",
         "@emotion/styled": "^11.10.0",
-        "@flowkit/ui-foundation": "^0.1.0",
         "@mui/icons-material": "^5.0.0",
         "@mui/material": "^5.15.0",
         "notistack": "^2.0.4",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "reactflow": "^11.5.0"
+        "reactflow": "^11.5.0",
+        "@openprojectx/ui-foundation": "^0.1.0"
     },
     "dependencies": {
         "@tabler/icons-react": "^3.30.0",
@@ -49,7 +50,6 @@
     "devDependencies": {
         "@emotion/react": "^11.10.6",
         "@emotion/styled": "^11.10.6",
-        "@flowkit/ui-foundation": "workspace:*",
         "@mui/icons-material": "5.0.3",
         "@mui/material": "5.15.0",
         "@mui/x-data-grid": "6.8.0",
@@ -67,6 +67,7 @@
         "ts-jest": "^29.3.2",
         "typescript": "^5.4.5",
         "vite": "^5.0.2",
-        "vite-plugin-dts": "^3.7.0"
+        "vite-plugin-dts": "^3.7.0",
+        "@openprojectx/ui-foundation": "workspace:*"
     }
 }

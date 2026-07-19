@@ -1,4 +1,4 @@
-import type { BuilderNodeSchema } from '@flowkit/flow-builder'
+import type { BuilderNodeSchema } from '@openprojectx/flow-builder'
 
 /**
  * Static BPMN element registry. `bpmn` maps to custom node renderers;

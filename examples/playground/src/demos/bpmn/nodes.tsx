@@ -2,7 +2,7 @@ import { memo } from 'react'
 import type { NodeProps } from 'reactflow'
 import { Handle, Position } from 'reactflow'
 import { Typography } from '@mui/material'
-import type { BuilderNodeData } from '@flowkit/flow-builder'
+import type { BuilderNodeData } from '@openprojectx/flow-builder'
 
 /**
  * Custom BPMN node shapes. The kit renders these via `config.nodeRenderers`;

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Box, Button, Dialog, DialogContent, Typography } from '@mui/material'
-import { FlowBuilderCanvas, FlowBuilderProvider, defaultIsValidConnection, parseFlowDocument, useFlowBuilder } from '@flowkit/flow-builder'
-import type { FlowBuilderConfig, FlowDocument } from '@flowkit/flow-builder'
-import '@flowkit/flow-builder/styles.css'
+import { FlowBuilderCanvas, FlowBuilderProvider, defaultIsValidConnection, parseFlowDocument, useFlowBuilder } from '@openprojectx/flow-builder'
+import type { FlowBuilderConfig, FlowDocument } from '@openprojectx/flow-builder'
+import '@openprojectx/flow-builder/styles.css'
 import { bpmnElements } from './elements'
 import { BpmnEndNode, BpmnGatewayNode, BpmnStartNode, BpmnTaskNode } from './nodes'
 

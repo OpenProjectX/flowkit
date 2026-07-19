@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AppBar, Box, IconButton, Tab, Tabs, Toolbar, Tooltip, Typography } from '@mui/material'
 import { IconMoon, IconSun } from '@tabler/icons-react'
-import { useThemeMode } from '@flowkit/ui-foundation'
+import { useThemeMode } from '@openprojectx/ui-foundation'
 import PipelineStudio from './demos/pipeline/PipelineStudio'
 import BpmnBuilder from './demos/bpmn/BpmnBuilder'
 

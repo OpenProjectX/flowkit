@@ -20,7 +20,7 @@ export default defineConfig({
     build: {
         lib: {
             entry: resolve(__dirname, 'src/index.ts'),
-            name: 'FlowkitUiFoundation',
+            name: 'OpenprojectxUiFoundation',
             formats: ['es'],
             fileName: () => 'index.js'
         },

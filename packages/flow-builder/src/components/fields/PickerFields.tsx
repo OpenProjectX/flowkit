@@ -1,6 +1,6 @@
 import { memo } from 'react'
 import { useTheme } from '@mui/material/styles'
-import { DatePicker, MonthDaysPicker, TimePicker, WeekDaysPicker } from '@flowkit/ui-foundation'
+import { DatePicker, MonthDaysPicker, TimePicker, WeekDaysPicker } from '@openprojectx/ui-foundation'
 import type { FieldRendererProps } from '../../types'
 import FieldWrapper from './FieldWrapper'
 

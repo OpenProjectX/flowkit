@@ -24,7 +24,7 @@ import {
 } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { IconMinus, IconPlus, IconSearch, IconX } from '@tabler/icons-react'
-import { MainCard, StyledFab, Transitions } from '@flowkit/ui-foundation'
+import { MainCard, StyledFab, Transitions } from '@openprojectx/ui-foundation'
 import type { BuilderNodeSchema, CategoryGroup } from '../types'
 import { useFlowBuilder } from '../FlowBuilderProvider'
 import { scoreAndSortNodes } from '../utils/search'

@@ -24,12 +24,12 @@ configuration.
 │  Supplies ONE FlowBuilderConfig: registry, rules, renderers,    │
 │  persistence, slots.                                            │
 ├────────────────────────────────────────────────────────────────┤
-│  @flowkit/flow-builder          ← the canvas kit                │
+│  @openprojectx/flow-builder          ← the canvas kit                │
 │  FlowBuilderCanvas · FlowBuilderProvider · NodePalette          │
 │  SchemaFields · PropertyInspectorDialog · BuilderNode/Edge      │
 │  GroupNode · StickyNote · graph/visibility/serialize utils      │
 ├────────────────────────────────────────────────────────────────┤
-│  @flowkit/ui-foundation         ← the design system             │
+│  @openprojectx/ui-foundation         ← the design system             │
 │  theme factory (light/dark) · MainCard · StyledButton/Fab       │
 │  Input/Dropdowns · CodeEditor · JsonEditor · DataGrid           │
 │  ConfirmDialog · Loader · pickers · hooks · utils               │

@@ -1,0 +1,41 @@
+name: Release
+
+on:
+    push:
+        branches: [master]
+
+concurrency: release
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write # changesets version PR
+            pull-requests: write
+            id-token: write # npm provenance (OIDC)
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - uses: pnpm/action-setup@v4
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version-file: .nvmrc
+                  cache: pnpm
+                  registry-url: https://registry.npmjs.org
+
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Create Version PR or Publish to npm
+              uses: changesets/action@v1
+              with:
+                  version: pnpm version-packages
+                  publish: pnpm release
+                  commit: 'chore: version packages'
+                  title: 'chore: version packages'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

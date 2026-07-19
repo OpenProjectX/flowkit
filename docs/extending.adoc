@@ -12,7 +12,7 @@ Zero backend. Schemas as a constant — the fastest way to a working builder.
 
 [source,tsx]
 ----
-import type { BuilderNodeSchema, FlowBuilderConfig } from '@flowkit/flow-builder'
+import type { BuilderNodeSchema, FlowBuilderConfig } from '@openprojectx/flow-builder'
 
 const operators: BuilderNodeSchema[] = [
     {
@@ -53,7 +53,7 @@ Field renderers receive `FieldRendererProps` (`inputParam`, `data`, `value`,
 
 [source,tsx]
 ----
-import { FieldWrapper } from '@flowkit/flow-builder'
+import { FieldWrapper } from '@openprojectx/flow-builder'
 
 // a color picker for the custom param type 'color'
 const ColorField = ({ inputParam, value, onChange, disabled }: FieldRendererProps) => (
@@ -85,7 +85,7 @@ ids so connections and serialization stay consistent.
 [source,tsx]
 ----
 import { Handle, Position, type NodeProps } from 'reactflow'
-import type { BuilderNodeData } from '@flowkit/flow-builder'
+import type { BuilderNodeData } from '@openprojectx/flow-builder'
 
 export const GatewayNode = ({ data, selected }: NodeProps<BuilderNodeData>) => (
     <div style={{ position: 'relative', width: 56, height: 56 }}>
@@ -129,7 +129,7 @@ Compose the exported helpers, or write your own `(connection, nodes, edges) => b
 
 [source,tsx]
 ----
-import { typedPortsIsValidConnection, noSelfNoCycles, typesIntersect, respectsListAnchors } from '@flowkit/flow-builder'
+import { typedPortsIsValidConnection, noSelfNoCycles, typesIntersect, respectsListAnchors } from '@openprojectx/flow-builder'
 
 // 1. typed ports, out of the box
 const a = { isValidConnection: typedPortsIsValidConnection, outputStrategy: 'standard' as const }

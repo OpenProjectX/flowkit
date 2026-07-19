@@ -6,9 +6,9 @@ import {
     typedPortsIsValidConnection,
     useFlowBuilder,
     parseFlowDocument
-} from '@flowkit/flow-builder'
-import type { FlowBuilderConfig, FlowDocument } from '@flowkit/flow-builder'
-import '@flowkit/flow-builder/styles.css'
+} from '@openprojectx/flow-builder'
+import type { FlowBuilderConfig, FlowDocument } from '@openprojectx/flow-builder'
+import '@openprojectx/flow-builder/styles.css'
 import { pipelineOperators } from './operators'
 
 const STORAGE_KEY = 'flowkit.pipeline'

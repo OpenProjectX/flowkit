@@ -10,9 +10,9 @@ flags, slots, theming, and the `useFlowBuilder` context API. Types from
 
 [source,tsx]
 ----
-import { FlowBuilderProvider, FlowBuilderCanvas } from '@flowkit/flow-builder'
-import { FlowkitThemeProvider } from '@flowkit/ui-foundation'
-import '@flowkit/flow-builder/styles.css'
+import { FlowBuilderProvider, FlowBuilderCanvas } from '@openprojectx/flow-builder'
+import { FlowkitThemeProvider } from '@openprojectx/ui-foundation'
+import '@openprojectx/flow-builder/styles.css'
 
 <FlowkitThemeProvider>
     <FlowBuilderProvider config={config}>
@@ -262,11 +262,11 @@ const {
 NOTE: `FlowBuilderProvider` wraps `reactflow`'s `ReactFlowProvider` — `useStore`,
 `useReactFlow`, `useUpdateNodeInternals` etc. work in any child component.
 
-== Theming (`@flowkit/ui-foundation`)
+== Theming (`@openprojectx/ui-foundation`)
 
 [source,tsx]
 ----
-import { FlowkitThemeProvider, useThemeMode, createFlowkitTheme } from '@flowkit/ui-foundation'
+import { FlowkitThemeProvider, useThemeMode, createFlowkitTheme } from '@openprojectx/ui-foundation'
 
 // uncontrolled — persists to localStorage['isDarkMode']
 <FlowkitThemeProvider>{children}</FlowkitThemeProvider>

@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { AsyncDropdown } from '@flowkit/ui-foundation'
+import { AsyncDropdown } from '@openprojectx/ui-foundation'
 import type { FieldRendererProps } from '../../types'
 import { useFlowBuilder } from '../../FlowBuilderProvider'
 import FieldWrapper from './FieldWrapper'

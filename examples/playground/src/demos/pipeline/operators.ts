@@ -1,4 +1,4 @@
-import type { BuilderNodeSchema } from '@flowkit/flow-builder'
+import type { BuilderNodeSchema } from '@openprojectx/flow-builder'
 
 /**
  * Static in-memory operator registry for the data-pipeline demo.

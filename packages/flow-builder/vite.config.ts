@@ -20,7 +20,7 @@ export default defineConfig({
     build: {
         lib: {
             entry: resolve(__dirname, 'src/index.ts'),
-            name: 'FlowkitFlowBuilder',
+            name: 'OpenprojectxFlowBuilder',
             formats: ['es'],
             fileName: () => 'index.js'
         },
@@ -33,7 +33,7 @@ export default defineConfig({
                 'notistack',
                 /^@mui\/.*/,
                 /^@emotion\/.*/,
-                /^@flowkit\/.*/
+                /^@openprojectx\/.*/
             ],
             output: {
                 assetFileNames: (assetInfo) => {

@@ -4,7 +4,7 @@ import { Background, Handle, NodeResizer, NodeToolbar, Position, useUpdateNodeIn
 import { alpha, darken, lighten, styled, useTheme } from '@mui/material/styles'
 import type { Theme } from '@mui/material/styles'
 import { Box, ButtonGroup, IconButton, Tooltip, Typography, Avatar } from '@mui/material'
-import { MainCard } from '@flowkit/ui-foundation'
+import { MainCard } from '@openprojectx/ui-foundation'
 import {
     IconAlertCircleFilled,
     IconCheck,

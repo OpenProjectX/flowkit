@@ -1,4 +1,4 @@
-# @flowkit/flow-builder
+# @openprojectx/flow-builder
 
 The visual node-builder canvas of flowkit — palette, typed connections,
 schema-driven property forms, group nodes, sticky notes, MiniMap, dirty
@@ -7,8 +7,8 @@ tracking and serialization, driven by a single `FlowBuilderConfig`.
 ## Minimal example
 
 ```tsx
-import { FlowBuilderProvider, FlowBuilderCanvas } from '@flowkit/flow-builder'
-import '@flowkit/flow-builder/styles.css'
+import { FlowBuilderProvider, FlowBuilderCanvas } from '@openprojectx/flow-builder'
+import '@openprojectx/flow-builder/styles.css'
 
 const config = {
     registry: { list: async () => myNodeSchemas },
@@ -21,7 +21,7 @@ const config = {
 ```
 
 Requires `reactflow` v11 and the MUI theme (best with
-`@flowkit/ui-foundation`'s `FlowkitThemeProvider`).
+`@openprojectx/ui-foundation`'s `FlowkitThemeProvider`).
 
 ## Key concepts
 

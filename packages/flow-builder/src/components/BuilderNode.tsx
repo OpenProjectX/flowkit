@@ -4,7 +4,7 @@ import { Handle, NodeToolbar, Position, useUpdateNodeInternals } from 'reactflow
 import { alpha, darken, lighten, styled, useTheme } from '@mui/material/styles'
 import type { Theme } from '@mui/material/styles'
 import { Avatar, Box, ButtonGroup, IconButton, Tooltip, Typography } from '@mui/material'
-import { MainCard } from '@flowkit/ui-foundation'
+import { MainCard } from '@openprojectx/ui-foundation'
 import {
     IconAlertCircleFilled,
     IconCheck,

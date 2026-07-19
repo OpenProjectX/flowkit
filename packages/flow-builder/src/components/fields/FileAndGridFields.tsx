@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { DataGrid, File } from '@flowkit/ui-foundation'
+import { DataGrid, File } from '@openprojectx/ui-foundation'
 import type { GridColDef } from '@mui/x-data-grid'
 import type { FieldRendererProps } from '../../types'
 import FieldWrapper from './FieldWrapper'

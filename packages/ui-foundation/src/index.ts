@@ -1,4 +1,4 @@
-// @flowkit/ui-foundation — public API
+// @openprojectx/ui-foundation — public API
 
 export * from './theme'
 export * from './hooks'

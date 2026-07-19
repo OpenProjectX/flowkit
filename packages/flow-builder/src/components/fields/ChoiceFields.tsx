@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { FormControlLabel, Switch } from '@mui/material'
-import { Dropdown, MultiDropdown } from '@flowkit/ui-foundation'
-import type { DropdownOption } from '@flowkit/ui-foundation'
+import { Dropdown, MultiDropdown } from '@openprojectx/ui-foundation'
+import type { DropdownOption } from '@openprojectx/ui-foundation'
 import type { FieldRendererProps } from '../../types'
 import FieldWrapper from './FieldWrapper'
 

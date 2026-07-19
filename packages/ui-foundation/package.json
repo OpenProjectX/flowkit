@@ -1,10 +1,11 @@
 {
-    "name": "@flowkit/ui-foundation",
+    "name": "@openprojectx/ui-foundation",
     "version": "0.1.0",
-    "description": "Design-system foundation for flowkit: theme factory, generic MUI components, hooks and utils",
+    "description": "Design-system foundation for openprojectx ui-foundation (flowkit): theme factory, generic MUI components, hooks and utils",
     "license": "Apache-2.0",
     "publishConfig": {
-        "access": "public"
+        "access": "public",
+        "provenance": true
     },
     "main": "./dist/index.js",
     "module": "./dist/index.js",

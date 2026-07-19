@@ -1,7 +1,7 @@
 import { memo, useState } from 'react'
 import { Box, Button } from '@mui/material'
 import { useTheme } from '@mui/material/styles'
-import { CodeEditor, JsonEditorInput } from '@flowkit/ui-foundation'
+import { CodeEditor, JsonEditorInput } from '@openprojectx/ui-foundation'
 import type { FieldRendererProps } from '../../types'
 import { useFlowBuilder } from '../../FlowBuilderProvider'
 import FieldWrapper from './FieldWrapper'

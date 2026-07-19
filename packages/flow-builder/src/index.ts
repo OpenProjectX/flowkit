@@ -1,4 +1,4 @@
-// @flowkit/flow-builder — public API
+// @openprojectx/flow-builder — public API
 
 // Core contract
 export type {

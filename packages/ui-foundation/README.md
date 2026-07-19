@@ -1,4 +1,4 @@
-# @flowkit/ui-foundation
+# @openprojectx/ui-foundation
 
 The design-system layer of flowkit: the Flowise look & feel as a standalone,
 dependency-injected TypeScript package.
@@ -25,7 +25,7 @@ dependency-injected TypeScript package.
 ## Usage
 
 ```tsx
-import { FlowkitThemeProvider, MainCard, StyledButton } from '@flowkit/ui-foundation'
+import { FlowkitThemeProvider, MainCard, StyledButton } from '@openprojectx/ui-foundation'
 
 <FlowkitThemeProvider>
     <MainCard title='Hello'>

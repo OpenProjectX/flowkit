@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Input, SensitiveInput } from '@flowkit/ui-foundation'
+import { Input, SensitiveInput } from '@openprojectx/ui-foundation'
 import type { FieldRendererProps } from '../../types'
 import { useFlowBuilder } from '../../FlowBuilderProvider'
 import FieldWrapper from './FieldWrapper'

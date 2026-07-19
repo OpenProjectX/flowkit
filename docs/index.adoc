@@ -44,10 +44,10 @@ designers — can stand up the same polished node-editor experience with a singl
 |===
 | Package | Contents
 
-| `@flowkit/ui-foundation`
+| `@openprojectx/ui-foundation`
 | Design system: theme factory (light/dark), ~35 generic MUI components, hooks, utils. No domain knowledge.
 
-| `@flowkit/flow-builder`
+| `@openprojectx/flow-builder`
 | The canvas kit: `FlowBuilderCanvas`, `FlowBuilderProvider`, `NodePalette`, `SchemaFields`, `PropertyInspectorDialog`, node/edge/group/sticky components, graph utils.
 
 | `examples/playground`

@@ -13,12 +13,12 @@ experience with a single config object.
 │ Your app — supplies ONE config object:                        │
 │ registry, rules, renderers, persistence, slots                │
 ├──────────────────────────────────────────────────────────────┤
-│ @flowkit/flow-builder — the canvas kit                        │
+│ @openprojectx/flow-builder — the canvas kit                        │
 │ FlowBuilderCanvas · NodePalette · SchemaFields                │
 │ PropertyInspectorDialog · BuilderNode/Edge · GroupNode        │
 │ FlowBuilderProvider (graph CRUD, dirty state, selection)      │
 ├──────────────────────────────────────────────────────────────┤
-│ @flowkit/ui-foundation — the design system                    │
+│ @openprojectx/ui-foundation — the design system                    │
 │ theme factory (light/dark) · MainCard · buttons · inputs      │
 │ Dropdown/AsyncDropdown · CodeEditor · JsonEditor · DataGrid   │
 │ ConfirmDialog · Loader · hooks · utils                        │
@@ -31,9 +31,9 @@ domain-specific is injected through `FlowBuilderConfig`.
 ## Quick start
 
 ```tsx
-import { FlowBuilderProvider, FlowBuilderCanvas, typedPortsIsValidConnection } from '@flowkit/flow-builder'
-import { FlowkitThemeProvider } from '@flowkit/ui-foundation'
-import '@flowkit/flow-builder/styles.css'
+import { FlowBuilderProvider, FlowBuilderCanvas, typedPortsIsValidConnection } from '@openprojectx/flow-builder'
+import { FlowkitThemeProvider } from '@openprojectx/ui-foundation'
+import '@openprojectx/flow-builder/styles.css'
 
 const operators = [
     {
@@ -98,8 +98,8 @@ Full technical docs in [`docs/`](docs) (AsciiDoc):
 
 ```
 packages/
-  ui-foundation/   @flowkit/ui-foundation — theme, generic components, hooks, utils
-  flow-builder/    @flowkit/flow-builder  — the visual builder kit
+  ui-foundation/   @openprojectx/ui-foundation — theme, generic components, hooks, utils
+  flow-builder/    @openprojectx/flow-builder  — the visual builder kit
 examples/
   playground/      two demos on one kit: data-pipeline studio + BPMN builder
 ```
