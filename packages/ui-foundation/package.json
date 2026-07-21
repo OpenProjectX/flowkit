@@ -83,5 +83,14 @@
         "typescript": "^5.4.5",
         "vite": "^5.0.2",
         "vite-plugin-dts": "^3.7.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/OpenProjectX/flowkit.git",
+        "directory": "packages/ui-foundation"
+    },
+    "homepage": "https://github.com/OpenProjectX/flowkit/tree/master/packages/ui-foundation#readme",
+    "bugs": {
+        "url": "https://github.com/OpenProjectX/flowkit/issues"
     }
 }
