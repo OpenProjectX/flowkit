@@ -1,6 +1,6 @@
 {
     "name": "@openprojectx/flow-builder",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Portable, configurable visual node-builder canvas: palette, schema-driven forms, typed connections, serialization",
     "license": "Apache-2.0",
     "publishConfig": {
@@ -39,7 +39,7 @@
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
         "reactflow": "^11.5.0",
-        "@openprojectx/ui-foundation": "^0.1.1"
+        "@openprojectx/ui-foundation": "^0.1.2"
     },
     "dependencies": {
         "@tabler/icons-react": "^3.30.0",
