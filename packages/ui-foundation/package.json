@@ -1,6 +1,6 @@
 {
     "name": "@openprojectx/ui-foundation",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Design-system foundation for openprojectx ui-foundation (flowkit): theme factory, generic MUI components, hooks and utils",
     "license": "Apache-2.0",
     "publishConfig": {
