@@ -6,6 +6,9 @@ on:
 jobs:
     debug:
         runs-on: ubuntu-latest
+        permissions:
+            id-token: write
+            contents: read
         steps:
             - uses: actions/checkout@v4
             - uses: pnpm/action-setup@v4
@@ -20,3 +23,9 @@ jobs:
                   echo "token length: ${#NODE_AUTH_TOKEN}"
                   echo "first 7 chars: ${NODE_AUTH_TOKEN:0:7}"
                   npm whoami --registry=https://registry.npmjs.org
+            - name: publish flow-builder with npm cli
+              env:
+                  NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+              run: |
+                  cd packages/flow-builder
+                  npm publish --registry=https://registry.npmjs.org --access public --provenance
