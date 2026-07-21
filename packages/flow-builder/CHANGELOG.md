@@ -1,5 +1,13 @@
 # @openprojectx/flow-builder
 
+## 0.1.2
+
+### Patch Changes
+
+-   d13dbef: Add repository metadata for provenance; publish via npm CLI
+-   Updated dependencies [d13dbef]
+    -   @openprojectx/ui-foundation@0.1.2
+
 ## 0.1.1
 
 ### Patch Changes
