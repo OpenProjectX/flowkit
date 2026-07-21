@@ -13,7 +13,7 @@
         "nuke": "rimraf node_modules packages/*/node_modules examples/*/node_modules",
         "changeset": "changeset",
         "version-packages": "changeset version",
-        "release": "pnpm -r --sort build && changeset publish"
+        "release": "bash scripts/release.sh"
     },
     "devDependencies": {
         "@typescript-eslint/eslint-plugin": "^8.18.2",
